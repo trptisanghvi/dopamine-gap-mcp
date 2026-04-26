@@ -1,6 +1,5 @@
 ### The Dopamine Gap 
 
-Description:
 how far has public language about dopamine traveled from what neuroscience actually established, and where did the divergence happen?
 
 the tool is building two things that work together:
