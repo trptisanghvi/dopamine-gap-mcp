@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Dopamine Gap — Discourse vs. Clinical Literature</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f7f6f2;
+    --text-primary: #1a1916;
+    --text-secondary: #5c5a54;
+    --text-tertiary: #9a9890;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141412;
+      --text-primary: #f0ede6;
+      --text-secondary: #a8a69e;
+      --text-tertiary: #6e6c66;
+    }
+  }
+
+  body {
+    font-family: 'Georgia', serif;
+    background: var(--bg);
+    color: var(--text-primary);
+    padding: 2rem 1.5rem 3rem;
+  }
+
+  .container { max-width: 820px; margin: 0 auto; }
+
+  .eyebrow {
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    margin-bottom: 0.6rem;
+  }
+
+  h1 {
+    font-size: clamp(1.4rem, 3.5vw, 2rem);
+    font-weight: normal;
+    margin-bottom: 0.4rem;
+  }
+
+  .subtitle {
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-style: italic;
+    margin-bottom: 1.75rem;
+  }
+
+  .legend {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+
+  .legend-swatch {
+    width: 22px;
+    height: 3px;
+    border-radius: 1px;
+    display: inline-block;
+  }
+
+  .legend-dashed {
+    width: 22px;
+    height: 0;
+    border-top: 2.5px dashed #1D9E75;
+    display: inline-block;
+  }
+
+  .chart-wrap {
+    position: relative;
+    width: 100%;
+    height: 360px;
+  }
+
+  .axis-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 6px;
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+  }
+
+  .note {
+    margin-top: 1.25rem;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    color: var(--text-tertiary);
+    line-height: 1.8;
+  }
+  .note span { display: block; }
+
+  /* loading / error states */
+  #status {
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    color: var(--text-tertiary);
+    min-height: 1.5rem;
+    margin-bottom: 0.5rem;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <p class="eyebrow">Semantic Gap Analysis · 2004–2024</p>
+  <h1>The Dopamine Gap</h1>
+  <p class="subtitle">Guardian articles mentioning "dopamine hit" vs. PubMed papers on reward prediction error — actual counts, independent axes.</p>
+
+  <div class="legend">
+    <span class="legend-item">
+      <span class="legend-swatch" style="background:#378ADD;"></span>
+      Public discourse — Guardian articles / yr (left axis)
+    </span>
+    <span class="legend-item">
+      <span class="legend-dashed"></span>
+      Clinical literature — PubMed papers / yr (right axis)
+    </span>
+  </div>
+
+  <p id="status">Loading live data…</p>
+
+  <div class="chart-wrap">
+    <canvas id="chart" role="img"
+      aria-label="Dual-axis line chart showing public discourse on dopamine rising sharply from 2004 while clinical literature stays flat at 0–2 papers per year.">
+    </canvas>
+  </div>
+
+  <div class="axis-labels">
+    <span style="color:#378ADD;">← Guardian articles / yr</span>
+    <span style="color:#1D9E75;">PubMed papers / yr →</span>
+  </div>
+
+  <div class="note">
+    <span>Sources: The Guardian open API (query: "dopamine hit") · PubMed (query: "dopamine reward prediction")</span>
+    <span>Key refs: Schultz et al. 1997 · Berridge &amp; Robinson 1998 · Berridge 2007 (Psychopharmacology)</span>
+  </div>
+
+</div>
+
+<script>
+const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)';
+const tickColor = isDark ? '#6e6c66' : '#9a9890';
+const tickFont  = { size: 11, family: "'Courier New', monospace" };
+
+let chartInstance = null;
+
+function renderChart(years, pubData, clinData) {
+  const maxPub = Math.max(...pubData);
+  const maxClin = Math.max(...clinData);
+  // round left axis max up to nearest 20
+  const leftMax = Math.ceil((maxPub + 10) / 20) * 20;
+  // right axis: at least 5, or next integer above max
+  const rightMax = Math.max(5, Math.ceil(maxClin) + 1);
+
+  if (chartInstance) chartInstance.destroy();
+
+  chartInstance = new Chart(document.getElementById('chart'), {
+    type: 'line',
+    data: {
+      labels: years,
+      datasets: [
+        {
+          label: 'Guardian articles',
+          data: pubData,
+          borderColor: '#378ADD',
+          backgroundColor: isDark ? 'rgba(55,138,221,0.10)' : 'rgba(55,138,221,0.08)',
+          borderWidth: 2,
+          pointRadius: 3,
+          pointBackgroundColor: '#378ADD',
+          tension: 0.3,
+          fill: true,
+          yAxisID: 'yLeft'
+        },
+        {
+          label: 'PubMed papers',
+          data: clinData,
+          borderColor: '#1D9E75',
+          borderDash: [5, 4],
+          borderWidth: 2,
+          pointRadius: 3,
+          pointBackgroundColor: '#1D9E75',
+          tension: 0.3,
+          fill: false,
+          yAxisID: 'yRight'
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => ctx.datasetIndex === 0
+              ? 'Guardian articles: ' + pubData[ctx.dataIndex]
+              : 'PubMed papers: '     + clinData[ctx.dataIndex]
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: {
+            font: tickFont,
+            color: tickColor,
+            maxRotation: 0,
+            autoSkip: false,
+            callback: (v, i) => i % 2 === 0 ? years[i] : ''
+          }
+        },
+        yLeft: {
+          type: 'linear',
+          position: 'left',
+          min: 0,
+          max: leftMax,
+          grid: { color: gridColor },
+          ticks: { font: tickFont, color: '#378ADD', stepSize: 20 }
+        },
+        yRight: {
+          type: 'linear',
+          position: 'right',
+          min: 0,
+          max: rightMax,
+          grid: { drawOnChartArea: false },
+          ticks: {
+            font: tickFont,
+            color: '#1D9E75',
+            stepSize: 1,
+            callback: v => Number.isInteger(v) ? v : ''
+          }
+        }
+      }
+    }
+  });
+}
+
+
+// If served statically (GitHub Pages), the /data endpoint won't exist —
+// fall back to the hardcoded snapshot values recorded during the last run.
+const FALLBACK = {
+  years:     ["'04","'05","'06","'07","'08","'09","'10","'11","'12","'13","'14","'15","'16","'17","'18","'19","'20","'21","'22","'23","'24"],
+  pub_data:  [23, 36, 16, 29, 16, 17, 16, 24, 38, 40, 39, 65, 49, 80, 70, 57, 54, 78, 90, 107, 141],
+  clin_data: [ 0,  0,  0,  0,  0,  1,  0,  1,  2,  1,  2,  2,  2,  2,  1,  1,  0,  0,  0,   0,   2],
+};
+
+const statusEl = document.getElementById('status');
+
+fetch('/data')
+  .then(r => {
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json();
+  })
+  .then(d => {
+    statusEl.textContent = 'Live data loaded.';
+    setTimeout(() => { statusEl.textContent = ''; }, 2000);
+    renderChart(d.years, d.pub_data, d.clin_data);
+  })
+  .catch(() => {
+    statusEl.textContent = 'Showing cached snapshot — live server not available.';
+    renderChart(FALLBACK.years, FALLBACK.pub_data, FALLBACK.clin_data);
+  });
+</script>
+</body>
+</html>
